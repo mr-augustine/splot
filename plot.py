@@ -22,7 +22,8 @@ class Plot:
                             'pitch_deg',
                             'roll_deg',
                             'status',
-                            'compass_vs_gps_heading']
+                            'compass_vs_gps_heading',
+                            'ticks_per_gps_update']
 
     _plots = {}
     _data = None
@@ -95,6 +96,8 @@ class Plot:
             self.__prepare_roll_deg_plot()
         elif plot_name == 'status':
             self.__prepare_status_plot()
+        elif plot_name == 'ticks_per_gps_update':
+            self.__prepare_ticks_per_gps_update_plot()
         elif plot_name == 'compass_vs_gps_heading':
             self.__prepare_compass_vs_gps_heading_plot()
 
@@ -372,3 +375,59 @@ class Plot:
         plt.grid()
         plt.plot(x_values, compass_y_values)
         plt.plot(x_values, gps_heading_y_values)
+
+    def __prepare_ticks_per_gps_update_plot(self):
+        latitudes = np.asarray(self._data.get_all('gps_latitude'))
+        longitudes = np.asarray(self._data.get_all('gps_longitude'))
+        ticks = np.asarray(self._data.get_all('odometer_ticks'))
+
+        start_index = self.__find_start_index(latitudes)
+
+        print 'latitudes start index: ' + str(self.__find_start_index(latitudes))
+        print 'longitudes start index: ' + str(self.__find_start_index(longitudes))
+
+        update_indexes = self.__find_indexes_for_nonzero_values(latitudes)
+        print 'update indexes: ' + str(update_indexes)
+
+        tick_deltas = self.__calculate_ticks_per_interval(ticks, update_indexes)
+        print 'delta ticks: ' + str(tick_deltas)
+
+        plt.figure(self._plots['ticks_per_gps_update'])
+        plt.xlabel('update iteration')
+        plt.ylabel('ticks')
+        plt.title('Ticks Per GPS Update Inteval\nAverage: ' + "{:.2f}".format(sum(tick_deltas)/(len(tick_deltas) + 0.0)))
+        plt.grid()
+        plt.plot(update_indexes, tick_deltas)
+
+    def __calculate_ticks_per_interval(self, ticks, interval_indexes):
+        delta_ticks = []
+
+        prev_tick_count = ticks[interval_indexes[0]]
+
+        for index in range(0, len(interval_indexes)):
+            new_tick_count = ticks[interval_indexes[index]]
+            tick_diff = new_tick_count - prev_tick_count
+
+            delta_ticks.append(tick_diff)
+            prev_tick_count = new_tick_count
+
+        return delta_ticks
+
+    def __find_indexes_for_nonzero_values(self, collection):
+        indexes = []
+
+        for index in range(0, len(collection)):
+            if collection[index] != 0:
+                indexes.append(index)
+
+        return indexes
+
+    def __find_start_index(self, collection):
+        start_index = 0
+
+        for index in range(0, len(collection)):
+            if collection[index] != 0:
+                start_index = index
+                break;
+
+        return start_index
