@@ -1,11 +1,18 @@
+"""
+file: data.py
+created: 20160806
+author(s): mr-augustine
+
+The Data class is responsible for reading and storing state variable data from
+the specified data file according to the specified state variable definition.
+
+The data in the file are assumed to be Little Endian.
+"""
 import struct
 
 from statevars import Statevars
 
 class Data:
-    """ Class responsible for reading and storing state variable data from the
-    specified data file according to the specified state variable definition
-    """
 
     _data_list = []
 
@@ -70,7 +77,7 @@ class Data:
     def get_data(self):
         """ Returns the data list of data frames """
         return self._data_list
-    
+
     def _read_next_dataframe(self, datafile, statevars_def):
         """ Returns a dictionary that contains the field names and associated
         values for the next data frame in the data file

@@ -1,5 +1,17 @@
+"""
+file: statevars.py
+created: 20160806
+author(s): mr-augustine
+
+The Statevars class is responsible for parsing the statevars definition file.
+
+Lines in the statevars definition file would look similar to this:
+uint32_t, main_loop_counter
+float, gps_latitude
+float, gps_longitude
+char[84], gprmc_sentence
+"""
 class Statevars:
-    """ Class responsible for parsing the statevars definition file """
 
     FIELD_DELIMETER = ','
     FIELD_DATATYPE_INDEX = 0

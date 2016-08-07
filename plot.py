@@ -1,3 +1,20 @@
+"""
+file: plot.py
+created: 20160806
+author(s): mr-augustine
+
+The Plot class is responsible for plotting the statevars data according to
+the list of plot names specified in the given file.
+
+Lines in the plot file would look similar to this:
+main_loop_counter
+#odometer_ticks
+compass_vs_gps_heading
+
+In the example above, the main_loop_counter plot would be created in Figure 1,
+and the compass_vs_gps_heading plot would be created in Figure 2. The
+odometer_ticks plot will not be created since that line is commented out.
+"""
 from math import radians, cos, sin, asin, sqrt
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,7 +23,6 @@ import sys
 from data import Data
 
 class Plot:
-    """ Class responsible for plotting the statevars data """
 
     SUPPORTED_PLOT_TYPES = ['compass_vs_gps_heading',
                             'gps_coordinates',
