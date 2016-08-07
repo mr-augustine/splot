@@ -1,5 +1,13 @@
 #!/usr/bin/python
 
+"""
+file: splot.py
+created: 20160806
+author(s): mr-augustine
+
+Statevars Plot (splot) produces plots for data in a given data file according to
+the file's user-defined format specification.
+"""
 import getopt
 import os.path
 import sys
@@ -51,27 +59,14 @@ def main(argv):
             print 'File: ' + argument + ' does not exist. Exiting...'
             sys.exit(2)
 
+    # Parse the statevars file
     myStatevar = Statevars(statevars_spec_filename)
-    # print myStatevar.get_varlist()
-    #
-    # print 'datatype: ' + Statevars.get_field_datatype(myStatevar.get_varlist()[0])
-    # print 'count: ' + str(Statevars.get_field_count(myStatevar.get_varlist()[0]))
-    # print 'name: ' + Statevars.get_field_name(myStatevar.get_varlist()[0])
-    # print 'expected value: ' + Statevars.get_field_exp_val(myStatevar.get_varlist()[0])
-    #
-    # print 'has_exp_val: ' + str(Statevars.has_exp_val(myStatevar.get_varlist()[0]))
 
+    # Use the parsed statevars to interpet the data in the data file
     myData = Data(input_filename, myStatevar)
 
-    # for frame in myData.get_data():
-        # print frame['gps_hdop']
-    #print myData.get_all('gps_hdop')
-
+    # Use the parsed data to create the plots specified by the user
     plotter = Plot(plot_types_list_filename, myData)
-
-# print 'Number of arguments: ', len(sys.argv), 'arguments.'
-# print 'Argument list: ', str(sys.argv)
-
 
 if __name__ == '__main__':
     main(sys.argv[1:])
