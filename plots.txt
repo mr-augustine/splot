@@ -3,7 +3,7 @@
 #gps_coordinates
 #gps_ground_course_deg
 #gps_ground_speed_kt
-gps_ground_speed_mph
+#gps_ground_speed_mph
 #gps_hdop
 #gps_pdop
 #gps_vdop
@@ -15,3 +15,4 @@ gps_ground_speed_mph
 #roll_deg
 #status
 ticks_per_gps_update
+meters_per_gps_update
