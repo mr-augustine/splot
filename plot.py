@@ -25,7 +25,8 @@ class Plot:
                             'status',
                             'compass_vs_gps_heading',
                             'ticks_per_gps_update',
-                            'meters_per_gps_update']
+                            'meters_per_gps_update',
+                            'ticks_per_meter_per_gps_update']
 
     _plots = {}
     _data = None
@@ -102,6 +103,8 @@ class Plot:
             self.__prepare_ticks_per_gps_update_plot()
         elif plot_name == 'meters_per_gps_update':
             self.__prepare_meters_per_gps_update_plot()
+        elif plot_name == 'ticks_per_meter_per_gps_update':
+            self.__prepare_ticks_per_meter_per_gps_update_plot()
         elif plot_name == 'compass_vs_gps_heading':
             self.__prepare_compass_vs_gps_heading_plot()
 
@@ -425,6 +428,50 @@ class Plot:
         plt.title('Displacement Per GPS Update Interval')
         plt.grid()
         plt.plot(update_indexes, distances)
+
+    def __prepare_ticks_per_meter_per_gps_update_plot(self):
+        latitudes = np.asarray(self._data.get_all('gps_latitude'))
+        longitudes = np.asarray(self._data.get_all('gps_longitude'))
+        ticks = np.asarray(self._data.get_all('odometer_ticks'))
+
+        update_indexes = self.__find_indexes_for_nonzero_values(latitudes)
+
+        coords = []
+
+        for index in range(0, len(latitudes)):
+            coords.append((latitudes[index], longitudes[index]))
+
+        distances = self.__calculate_dist_per_interval(coords, update_indexes)
+        tick_deltas = self.__calculate_ticks_per_interval(ticks, update_indexes)
+
+        ticks_per_meter = []
+
+        for index in range(0, len(update_indexes)):
+            ticks = tick_deltas[index]
+            meters = distances[index]
+
+            if meters != 0:
+                interval_ticks_per_meter = ticks/meters
+            else:
+                interval_ticks_per_meter = 0.0
+
+            ticks_per_meter.append(interval_ticks_per_meter)
+
+        non_zero_ticks_per_meter = []
+
+        for index in range(0, len(ticks_per_meter)):
+            tpm = ticks_per_meter[index]
+            if tpm > 0.0:
+                non_zero_ticks_per_meter.append(tpm)
+
+        avg_ticks_per_meter = sum(non_zero_ticks_per_meter)/len(non_zero_ticks_per_meter)
+
+        plt.figure(self._plots['ticks_per_meter_per_gps_update'])
+        plt.xlabel('interval index')
+        plt.ylabel('ticks per meter')
+        plt.title('Ticks Per Meter Per GPS Update Interval\nAverage: ' + "{:.4f}".format(avg_ticks_per_meter) + ' ticks/meter')
+        plt.grid()
+        plt.plot(update_indexes, ticks_per_meter)
 
     def __calculate_dist_between_gps_coords(self, coord1, coord2):
         lat1 = coord1[0]

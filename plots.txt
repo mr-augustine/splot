@@ -14,5 +14,6 @@
 #pitch_deg
 #roll_deg
 #status
-ticks_per_gps_update
-meters_per_gps_update
+#ticks_per_gps_update
+#meters_per_gps_update
+ticks_per_meter_per_gps_update
