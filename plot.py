@@ -270,17 +270,6 @@ class Plot:
         plt.grid()
         plt.scatter(longitudes, latitudes, color='g', marker='o')
 
-    def _prepare_gps_cumulative_dist_plot(self):
-        latitudes = np.asarray(self._data.get_all('gps_latitude'))
-        longitudes = np.asarray(self._data.get_all('gps_longitude'))
-        iterations = np.asarray(self._data.get_all('main_loop_counter'))
-
-        earth_radus_m = 6371000
-        lat_rad = math.radians(latitudes)
-        long_rad = math.radians(longitudes)
-
-        # Continue here
-
     def _prepare_gps_ground_course_deg_plot(self):
         """ Plots the true course over the ground """
 
@@ -570,11 +559,11 @@ class Plot:
         ticks_per_meter = []
 
         for index in range(0, len(update_indexes)):
-            ticks = tick_deltas[index]
-            meters = distances[index]
+            interval_ticks = tick_deltas[index]
+            interval_meters = distances[index]
 
-            if meters != 0:
-                interval_ticks_per_meter = ticks/meters
+            if interval_meters != 0:
+                interval_ticks_per_meter = interval_ticks/interval_meters
             else:
                 interval_ticks_per_meter = 0.0
 
@@ -589,11 +578,15 @@ class Plot:
                 non_zero_ticks_per_meter.append(tpm)
 
         avg_ticks_per_meter = sum(non_zero_ticks_per_meter)/len(non_zero_ticks_per_meter)
+        total_distance = sum(distances)
+        total_ticks = np.amax(ticks)
 
         plt.figure(self._plots['ticks_per_meter_per_gps_update'])
         plt.xlabel('interval index')
         plt.ylabel('ticks per meter')
-        plt.title('Ticks Per Meter Per GPS Update Interval\nAverage: ' + \
-                "{:.4f}".format(avg_ticks_per_meter) + ' ticks/meter')
+        plt.title('Ticks Per Meter Per GPS Update Interval\nInterval Average: ' + \
+                "{:.4f}".format(avg_ticks_per_meter) + ' ticks/meter\n' + \
+                'Course Ticks / Course Distance: ' + \
+                "{:.4f}".format(total_ticks/total_distance) + ' ticks/meter')
         plt.grid()
         plt.plot(update_indexes, ticks_per_meter)
