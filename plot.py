@@ -1,3 +1,4 @@
+from math import radians, cos, sin, asin, sqrt
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
@@ -22,7 +23,10 @@ class Plot:
                             'pitch_deg',
                             'roll_deg',
                             'status',
-                            'compass_vs_gps_heading']
+                            'compass_vs_gps_heading',
+                            'ticks_per_gps_update',
+                            'meters_per_gps_update',
+                            'ticks_per_meter_per_gps_update']
 
     _plots = {}
     _data = None
@@ -95,6 +99,12 @@ class Plot:
             self.__prepare_roll_deg_plot()
         elif plot_name == 'status':
             self.__prepare_status_plot()
+        elif plot_name == 'ticks_per_gps_update':
+            self.__prepare_ticks_per_gps_update_plot()
+        elif plot_name == 'meters_per_gps_update':
+            self.__prepare_meters_per_gps_update_plot()
+        elif plot_name == 'ticks_per_meter_per_gps_update':
+            self.__prepare_ticks_per_meter_per_gps_update_plot()
         elif plot_name == 'compass_vs_gps_heading':
             self.__prepare_compass_vs_gps_heading_plot()
 
@@ -372,3 +382,159 @@ class Plot:
         plt.grid()
         plt.plot(x_values, compass_y_values)
         plt.plot(x_values, gps_heading_y_values)
+
+    def __prepare_ticks_per_gps_update_plot(self):
+        latitudes = np.asarray(self._data.get_all('gps_latitude'))
+        longitudes = np.asarray(self._data.get_all('gps_longitude'))
+        ticks = np.asarray(self._data.get_all('odometer_ticks'))
+
+        start_index = self.__find_start_index(latitudes)
+
+        print 'latitudes start index: ' + str(self.__find_start_index(latitudes))
+        print 'longitudes start index: ' + str(self.__find_start_index(longitudes))
+
+        update_indexes = self.__find_indexes_for_nonzero_values(latitudes)
+        print 'update indexes: ' + str(update_indexes)
+
+        tick_deltas = self.__calculate_ticks_per_interval(ticks, update_indexes)
+        print 'delta ticks: ' + str(tick_deltas)
+
+        plt.figure(self._plots['ticks_per_gps_update'])
+        plt.xlabel('update iteration')
+        plt.ylabel('ticks')
+        plt.title('Ticks Per GPS Update Interval\nAverage: ' + "{:.2f}".format(sum(tick_deltas)/(len(tick_deltas) + 0.0)))
+        plt.grid()
+        plt.plot(update_indexes, tick_deltas)
+
+    def __prepare_meters_per_gps_update_plot(self):
+        latitudes = np.asarray(self._data.get_all('gps_latitude'))
+        longitudes = np.asarray(self._data.get_all('gps_longitude'))
+
+        update_indexes = self.__find_indexes_for_nonzero_values(latitudes)
+
+        coords = []
+
+        for index in range(0, len(latitudes)):
+            coords.append((latitudes[index], longitudes[index]))
+
+        distances = self.__calculate_dist_per_interval(coords, update_indexes)
+
+        print 'update indexes: ' + str(update_indexes)
+        print 'distances: ' + str(distances)
+
+        plt.figure(self._plots['meters_per_gps_update'])
+        plt.xlabel('update iteration')
+        plt.ylabel('distance (meters)')
+        plt.title('Displacement Per GPS Update Interval')
+        plt.grid()
+        plt.plot(update_indexes, distances)
+
+    def __prepare_ticks_per_meter_per_gps_update_plot(self):
+        latitudes = np.asarray(self._data.get_all('gps_latitude'))
+        longitudes = np.asarray(self._data.get_all('gps_longitude'))
+        ticks = np.asarray(self._data.get_all('odometer_ticks'))
+
+        update_indexes = self.__find_indexes_for_nonzero_values(latitudes)
+
+        coords = []
+
+        for index in range(0, len(latitudes)):
+            coords.append((latitudes[index], longitudes[index]))
+
+        distances = self.__calculate_dist_per_interval(coords, update_indexes)
+        tick_deltas = self.__calculate_ticks_per_interval(ticks, update_indexes)
+
+        ticks_per_meter = []
+
+        for index in range(0, len(update_indexes)):
+            ticks = tick_deltas[index]
+            meters = distances[index]
+
+            if meters != 0:
+                interval_ticks_per_meter = ticks/meters
+            else:
+                interval_ticks_per_meter = 0.0
+
+            ticks_per_meter.append(interval_ticks_per_meter)
+
+        non_zero_ticks_per_meter = []
+
+        for index in range(0, len(ticks_per_meter)):
+            tpm = ticks_per_meter[index]
+            if tpm > 0.0:
+                non_zero_ticks_per_meter.append(tpm)
+
+        avg_ticks_per_meter = sum(non_zero_ticks_per_meter)/len(non_zero_ticks_per_meter)
+
+        plt.figure(self._plots['ticks_per_meter_per_gps_update'])
+        plt.xlabel('interval index')
+        plt.ylabel('ticks per meter')
+        plt.title('Ticks Per Meter Per GPS Update Interval\nAverage: ' + "{:.4f}".format(avg_ticks_per_meter) + ' ticks/meter')
+        plt.grid()
+        plt.plot(update_indexes, ticks_per_meter)
+
+    def __calculate_dist_between_gps_coords(self, coord1, coord2):
+        lat1 = coord1[0]
+        long1 = coord1[1]
+        lat2 = coord2[0]
+        long2 = coord2[1]
+
+        long1, lat1, long2, lat2 = map(radians, [long1, lat1, long2, lat2])
+
+        dlong = long2 - long1
+        dlat = lat2 - lat1
+
+        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlong/2)**2
+        c = 2 * asin(sqrt(a))
+
+        meters = 6371000 * c
+
+        return meters
+
+    def __calculate_dist_per_interval(self, coordinates, interval_indexes):
+        # coordinates is a list of tuples (latitude, longitude)
+        distances = []
+
+        prev_position = coordinates[interval_indexes[0]]
+
+        for index in range(0, len(interval_indexes)):
+            new_position = coordinates[interval_indexes[index]]
+            distance = self.__calculate_dist_between_gps_coords(prev_position, new_position)
+
+            distances.append(distance)
+            prev_position = new_position
+
+        return distances
+
+    def __calculate_ticks_per_interval(self, ticks, interval_indexes):
+        delta_ticks = []
+
+        prev_tick_count = ticks[interval_indexes[0]]
+
+        for index in range(0, len(interval_indexes)):
+            new_tick_count = ticks[interval_indexes[index]]
+            tick_diff = new_tick_count - prev_tick_count
+
+            delta_ticks.append(tick_diff)
+            prev_tick_count = new_tick_count
+
+        return delta_ticks
+
+    def __find_indexes_for_nonzero_values(self, collection):
+        indexes = []
+
+        for index in range(0, len(collection)):
+            if collection[index] != 0:
+                indexes.append(index)
+
+        return indexes
+
+    def __find_start_index(self, collection):
+        start_index = 0
+
+        for index in range(0, len(collection)):
+            if collection[index] != 0:
+                start_index = index
+                break;
+
+        return start_index

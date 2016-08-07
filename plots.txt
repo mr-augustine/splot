@@ -4,9 +4,9 @@
 #gps_ground_course_deg
 #gps_ground_speed_kt
 #gps_ground_speed_mph
-gps_hdop
-gps_pdop
-gps_vdop
+#gps_hdop
+#gps_pdop
+#gps_vdop
 #gps_satcount
 #heading_deg
 #main_loop_counter
@@ -14,3 +14,6 @@ gps_vdop
 #pitch_deg
 #roll_deg
 #status
+#ticks_per_gps_update
+#meters_per_gps_update
+ticks_per_meter_per_gps_update
