@@ -1,6 +1,6 @@
 # Ignore this line
 #compass_vs_gps_heading
-#gps_coordinates
+gps_coordinates
 #gps_ground_course_deg
 #gps_ground_speed_kt
 #gps_ground_speed_mph
@@ -16,4 +16,5 @@
 #status
 #ticks_per_gps_update
 #meters_per_gps_update
-ticks_per_meter_per_gps_update
+#ticks_per_iteration
+#ticks_per_meter_per_gps_update

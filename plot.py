@@ -42,6 +42,7 @@ class Plot:
                             'roll_deg',
                             'status',
                             'ticks_per_gps_update',
+                            'ticks_per_iteration',
                             'ticks_per_meter_per_gps_update']
 
     _plots = {}
@@ -123,6 +124,8 @@ class Plot:
             self._prepare_status_plot()
         elif plot_name == 'ticks_per_gps_update':
             self._prepare_ticks_per_gps_update_plot()
+        elif plot_name == 'ticks_per_iteration':
+            self._prepare_ticks_per_iteration_plot()
         elif plot_name == 'ticks_per_meter_per_gps_update':
             self._prepare_ticks_per_meter_per_gps_update_plot()
 
@@ -264,7 +267,9 @@ class Plot:
         self._fill_zeroed_values(latitudes)
         self._fill_zeroed_values(longitudes)
 
-        plt.figure(self._plots['gps_coordinates'])
+        #plt.figure(self._plots['gps_coordinates'])
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['gps_coordinates']) + ' - GPS Coordinates')
         plt.xlabel('longitude')
         plt.ylabel('latitude')
         plt.title('GPS Coordinates')
@@ -552,6 +557,45 @@ class Plot:
                 "{:.2f}".format(sum(tick_deltas)/(len(tick_deltas) + 0.0)))
         plt.grid()
         plt.plot(update_indexes, tick_deltas)
+
+    def _prepare_ticks_per_iteration_plot(self):
+        """ Plots the number of ticks that were counted during each iteration"""
+
+        ticks = np.asarray(self._data.get_all('odometer_ticks'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        prev_ticks = ticks[0]
+        ticks_per_iter = []
+        for iteration in range(0, len(iterations)):
+            ticks_per_iter.append(ticks[iteration] - prev_ticks)
+
+            prev_ticks = ticks[iteration]
+
+        max_ticks = max(ticks_per_iter)
+        avg_ticks_per_iter = sum(ticks_per_iter) / (len(ticks) + 0.0)
+        stats = {}
+
+        for i in range(0, max_ticks + 1):
+            stats[i] = 0
+
+        for tick_count in ticks_per_iter:
+            stats[tick_count] = stats[tick_count] + 1
+
+        title_stats = ''
+        for tick_count in sorted(stats.keys()):
+            title_stats += str(tick_count) + ': ' + str(stats[tick_count]) + \
+            ' (' + "{:.2f}".format(stats[tick_count] * 100.0/len(ticks)) + '%) '
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['ticks_per_iteration']) + \
+            ' - Odometer Ticks Per Iteration')
+        plt.xlabel('iteration')
+        plt.ylabel('ticks')
+        plt.title('Ticks Per Iteration' + '\n[max: ' + str(max_ticks) + \
+            '; mean: ' + "{:.2f}".format(avg_ticks_per_iter) + ']' + \
+            '\n' + title_stats)
+        plt.grid()
+        plt.plot(iterations, ticks_per_iter)
 
     def _prepare_ticks_per_meter_per_gps_update_plot(self):
         """ Plots the number of ticks that were counted during each
