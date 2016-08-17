@@ -153,7 +153,7 @@ class Plot:
 
     def _calculate_dist_per_interval(self, coordinates, interval_indexes):
         """ Returns a list of the distance traveled between each
-        GPS update interval
+        GPS update interval in meters
         """
 
         # coordinates is a list of tuples (latitude, longitude)
@@ -242,7 +242,9 @@ class Plot:
 
         self._fill_zeroed_values(gps_heading_y_values)
 
-        plt.figure(self._plots['compass_vs_gps_heading'])
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['compass_vs_gps_heading']) + \
+            ' - Compass Heading vs GPS Heading')
         plt.xlabel('iteration')
         plt.ylabel('heading')
         plt.title('Compass Heading (Magnetic) and GPS Heading (True) in Degrees')
@@ -267,12 +269,20 @@ class Plot:
         self._fill_zeroed_values(latitudes)
         self._fill_zeroed_values(longitudes)
 
-        #plt.figure(self._plots['gps_coordinates'])
+        # Calculate total distance driven during this runningcoords = []
+        coords = []
+        for index in range(0, len(latitudes)):
+            coords.append((latitudes[index], longitudes[index]))
+
+        distances = self._calculate_dist_per_interval(coords, range(0, len(latitudes)))
+        total_distance = sum(distances)
+
         plt.figure().canvas.set_window_title('Figure ' + \
             str(self._plots['gps_coordinates']) + ' - GPS Coordinates')
         plt.xlabel('longitude')
         plt.ylabel('latitude')
-        plt.title('GPS Coordinates')
+        plt.title('GPS Coordinates' + \
+            '\ntotal distance: ' + "{:.2f}".format(total_distance) + ' meters')
         plt.axis('equal')
 
         # Find the ranges of the latitude and longitudes to reshape the axes
@@ -334,10 +344,15 @@ class Plot:
 
         self._fill_zeroed_values(y_values)
 
-        plt.figure(self._plots['gps_ground_speed_mph'])
+        #plt.figure(self._plots['gps_ground_speed_mph'])
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['gps_ground_speed_mph']) + \
+            ' - Ground Speed in Miles per Hour')
         plt.xlabel('iteration')
         plt.ylabel('speed (mph)')
-        plt.title('GPS Ground Speed in Miles per Hour')
+        plt.title('GPS Ground Speed in Miles per Hour' + \
+            '\nmax: ' + "{:.2f}".format(max(y_values)) + \
+            '  mean: ' + "{:.2f}".format(sum(y_values)/(len(y_values) + 0.0)))
         plt.ylim([min(y_values), max(y_values) + 1])
         plt.grid()
         plt.plot(x_values, y_values)
@@ -464,10 +479,13 @@ class Plot:
         y_values = np.asarray(self._data.get_all('odometer_ticks'))
         x_values = np.asarray(self._data.get_all('main_loop_counter'))
 
-        plt.figure(self._plots['odometer_ticks'])
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['odometer_ticks']) + \
+            ' - Cumulative Odometer Ticks')
         plt.xlabel('iteration')
         plt.ylabel('ticks')
-        plt.title('Odometer Ticks')
+        plt.title('Odometer Ticks' + \
+            '\ntotal: ' + str(max(y_values)))
         plt.grid()
         plt.plot(x_values, y_values)
 
@@ -641,7 +659,9 @@ class Plot:
         total_distance = sum(distances)
         total_ticks = np.amax(ticks)
 
-        plt.figure(self._plots['ticks_per_meter_per_gps_update'])
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['ticks_per_meter_per_gps_update']) + \
+            ' - Ticks Per Meter Per GPS Update Interval')
         plt.xlabel('interval index')
         plt.ylabel('ticks per meter')
         plt.title('Ticks Per Meter Per GPS Update Interval\nInterval Average: ' + \
