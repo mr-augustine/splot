@@ -15,7 +15,7 @@ In the example above, the main_loop_counter plot would be created in Figure 1,
 and the compass_vs_gps_heading plot would be created in Figure 2. The
 odometer_ticks plot will not be created since that line is commented out.
 """
-from math import radians, cos, sin, asin, sqrt
+from math import radians, degrees, cos, sin, asin, sqrt, atan2
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
@@ -39,6 +39,7 @@ class Plot:
                             'meters_per_gps_update',
                             'odometer_ticks',
                             'pitch_deg',
+                            'position_estimates',
                             'roll_deg',
                             'status',
                             'ticks_per_gps_update',
@@ -118,6 +119,8 @@ class Plot:
             self._prepare_odometer_ticks_plot()
         elif plot_name == 'pitch_deg':
             self._prepare_pitch_deg_plot()
+        elif plot_name == 'position_estimates':
+            self._prepare_position_estimates_plot()
         elif plot_name == 'roll_deg':
             self._prepare_roll_deg_plot()
         elif plot_name == 'status':
@@ -501,6 +504,116 @@ class Plot:
         plt.title('Pitch in Degrees')
         plt.grid()
         plt.plot(x_values, y_values)
+
+    def _prepare_position_estimates_plot(self):
+        """ Plots the estimated positions between GPS updates """
+
+        latitudes = np.asarray(self._data.get_all('gps_latitude'))
+        longitudes = np.asarray(self._data.get_all('gps_longitude'))
+        ticks = np.asarray(self._data.get_all('odometer_ticks'))
+        headings = np.asarray(self._data.get_all('heading_deg'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        ticks_per_meter = 7.6
+        earth_radius_m = 6371393.0
+
+        # Find the indexes of the non-zero GPS coordinates
+        update_indexes = self._find_indexes_for_nonzero_values(latitudes)
+
+        prev_ticks = ticks[0]
+        ticks_per_iter = []
+        for iteration in range(0, len(iterations)):
+            ticks_per_iter.append(ticks[iteration] - prev_ticks)
+
+            prev_ticks = ticks[iteration]
+
+        lats = []
+        longs = []
+
+        # Remove zeroed values
+        for i in update_indexes:
+            lats.append(latitudes[i])
+            longs.append(longitudes[i])
+            # print "coordinate: " + str(latitudes[i]) + ", " + str(longitudes[i])
+
+        est_lats = []
+        est_longs = []
+
+        print "update_indexes: " + str(update_indexes)
+
+        #for index in range(0, len(lats)):
+        for index in range(1, 2):
+            known_lat = lats[index]
+            known_long = longs[index]
+
+            print "iteration: " + str(update_indexes[index])
+            print "gps coord: " + str(lats[index]) + ", " + str(longs[index])
+
+            i = update_indexes[index]
+
+            while (i < max(update_indexes) and i < update_indexes[index + 1]):
+                distance = (ticks_per_iter[i] + 0.0) / ticks_per_meter
+
+                est_lat = asin( sin(radians(known_lat)) * cos(distance/earth_radius_m) + \
+                    cos(radians(known_lat)) * sin(distance/earth_radius_m) * cos(radians(headings[i] + 4)) )
+                    # 4 == declination angle https://upload.wikimedia.org/wikipedia/commons/1/11/World_Magnetic_Declination_2015.pdf
+
+                est_long = radians(known_long) + atan2( sin(radians(headings[i] + 4)) * sin(distance/earth_radius_m) * cos(radians(known_lat)), \
+                    cos(distance/earth_radius_m) - sin(radians(known_lat)) * sin(est_lat) )
+
+                # est_long = (degrees(est_long) + 540) % 360 - 180
+
+                if (distance > 0.0):
+                    est_lats.append(degrees(est_lat))
+                    est_longs.append(degrees(est_long))
+
+                    known_lat = degrees(est_lat)
+                    known_long = degrees(est_long)
+
+                print "ticks[" + str(i) + "]: " + str(ticks_per_iter[i]) + "; distance: " + str(distance) + "; heading: " + str(headings[i]) + \
+                    "; est coord: " + str(degrees(est_lat)) + ", " + str(degrees(est_long))
+
+                i = i + 1
+
+                if i >= max(update_indexes):
+                    break
+
+        # # Calculate total distance driven during this runningcoords = []
+        # coords = []
+        # for index in range(0, len(latitudes)):
+        #     coords.append((latitudes[index], longitudes[index]))
+        #
+        # distances = self._calculate_dist_per_interval(coords, range(0, len(latitudes)))
+        # total_distance = sum(distances)
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['position_estimates']) + ' - GPS Position Estimates')
+        plt.xlabel('longitude')
+        plt.ylabel('latitude')
+        plt.title('GPS Coordinates and Position Estimates' + \
+            '\nusing Heading and Odometry')
+        plt.axis('equal')
+
+        # Find the ranges of the latitude and longitudes to reshape the axes
+        min_long = min(longitudes)
+        max_long = max(longitudes)
+        min_lat = min(latitudes)
+        max_lat = max(latitudes)
+        long_buffer = abs(max_long - min_long) * 0.1
+        lat_buffer = abs(max_lat - min_lat) * 0.1
+
+        # Reshape the axes dimensions to place whitespace padding on all sides
+        # plt.xlim([min(longitudes) - long_buffer, max(longitudes) + long_buffer])
+        # plt.ylim([min(latitudes) - lat_buffer, max(latitudes) + lat_buffer])
+
+        plt.ticklabel_format(style='plain', useOffset=False)
+        plt.grid()
+        plt.scatter(longs, lats, color='g', marker='o')
+        plt.scatter(est_longs, est_lats, color='r', marker="x")
+
+        print "len(est_lats): " + str(len(est_lats))
+        #print "est_lats: " + str(est_lats)
+        #print "est_longs: " + str(est_longs)
 
     def _prepare_roll_deg_plot(self):
         """ Plots the roll """
