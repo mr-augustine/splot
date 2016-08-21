@@ -174,43 +174,43 @@ class Plot:
         return distances
 
     def gcs_to_n_vector(self,lat,longitude):
-        phi = math.radians(lat)
-        theta = math.radians(longitude)
-        x = math.cos(phi) * math.cos(theta)
-        y = math.cos(phi) * math.sin(theta)
-        z = math.sin(phi)
+        phi = radians(lat)
+        theta = radians(longitude)
+        x = cos(phi) * cos(theta)
+        y = cos(phi) * sin(theta)
+        z = sin(phi)
         return [x,y,z]
 
     def n_vector_to_gcs(self,nvector):
         xsquared = nvector[0]**2
         ysquared = nvector[1]**2
-        d = math.sqrt((xsquared+ysquared))
+        d = sqrt((xsquared+ysquared))
 
-        lat = math.atan2(nvector[2],d)
-        glong = math.atan2(nvector[1],nvector[0])
-        return (math.degrees(lat),math.degrees(glong))
+        lat = atan2(nvector[2],d)
+        glong = atan2(nvector[1],nvector[0])
+        return (degrees(lat),degrees(glong))
 
     def calculate_using_vectors(self,latitude,longitude,distance,heading):
         r_earth = 6371e3
         north_vector = [0,0,1]
         initial_location = (latitude,longitude)
 
-        initial_vector = gcs_to_n_vector(initial_location[0],initial_location[1])
+        initial_vector = self.gcs_to_n_vector(initial_location[0],initial_location[1])
         theta_bearing = radians(heading)
 
-        Get the vector east of initial location a
+        #Get the vector east of initial location a
         de = np.cross(north_vector,initial_vector)
         #North vector at initial location
         dn = np.cross(initial_vector,de)
 
         #We need to compute the direction
-        direction = (np.dot(dn,math.cos(theta_bearing))) + (np.dot(de,math.sin(theta_bearing)))
+        direction = (np.dot(dn,cos(theta_bearing))) + (np.dot(de,sin(theta_bearing)))
 
-        xv = np.dot(initial_vector,math.cos(distance_traveled))
-        yv = np.dot(direction,math.sin(distance_traveled))
+        xv = np.dot(initial_vector,cos(distance/r_earth))
+        yv = np.dot(direction,sin(distance/r_earth))
         arrival_vector = xv + yv
 
-        return n_vector_to_gcs(arrival_vector)
+        return self.n_vector_to_gcs(arrival_vector)
 
 
 
@@ -649,6 +649,9 @@ class Plot:
         fudge_est_lats = []
         fudge_est_longs = []
 
+        nvector_est_lats = []
+        nvector_est_longs = []
+
         print "update_indexes: " + str(update_indexes)
 
         #for index in range(0, len(lats)):
@@ -661,6 +664,9 @@ class Plot:
 
             fudge_known_lat = lats[index]
             fudge_known_long = longs[index]
+
+            nvector_known_lat = lats[index]
+            nvector_known_long = longs[index]
 
             print "iteration: " + str(update_indexes[index])
             print "gps coord: " + str(lats[index]) + ", " + str(longs[index])
@@ -689,6 +695,7 @@ class Plot:
                 (fudge_lat, fudge_long) = self._calculate_gps_position(fudge_known_lat, fudge_known_long, distance, fudged_compass_heading)
                 (est_lat, est_long) = self._calculate_gps_position(known_lat, known_long, distance, compass_heading)
                 (alt_est_lat, alt_est_long) = self._calculate_gps_position(alt_known_lat, alt_known_long, distance, gps_heading)
+                (nvector_est_lat, nvector_est_long) = self.calculate_using_vectors(nvector_known_lat, nvector_known_long, distance, compass_heading)
 
                 if (distance > 0.0):
                     est_lats.append(est_lat)
@@ -700,6 +707,9 @@ class Plot:
                     fudge_est_lats.append(fudge_lat)
                     fudge_est_longs.append(fudge_long)
 
+                    nvector_est_lats.append(nvector_est_lat)
+                    nvector_est_longs.append(nvector_est_long)
+
                     known_lat = est_lat
                     known_long = est_long
 
@@ -708,6 +718,9 @@ class Plot:
 
                     fudge_known_lat = fudge_lat
                     fudge_known_long = fudge_long
+
+                    nvector_known_lat = nvector_est_lat
+                    nvector_known_long = nvector_est_long
 
                 print "ticks[" + str(i) + "]: " + str(ticks_per_iter[i]) + "; distance: " + str(distance) + "; heading: " + str(headings[i]) + \
                     "; est coord: " + str(est_lat) + ", " + str(est_long)
@@ -741,8 +754,9 @@ class Plot:
         plt.grid()
         plt.scatter(longs, lats, color='g', marker='o')
         plt.scatter(est_longs, est_lats, color='r', marker='x')
-        plt.scatter(alt_est_longs, alt_est_lats, color='b', marker='x')
-        plt.scatter(fudge_est_longs, fudge_est_lats, color='k', marker='x')
+        #plt.scatter(alt_est_longs, alt_est_lats, color='b', marker='x')
+        #plt.scatter(fudge_est_longs, fudge_est_lats, color='k', marker='x')
+        plt.scatter(nvector_est_longs, nvector_est_lats, color='c', marker='v')
 
         print "len(est_lats): " + str(len(est_lats))
         #print "est_lats: " + str(est_lats)
