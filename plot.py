@@ -739,16 +739,16 @@ class Plot:
         plt.axis('equal')
 
         # Find the ranges of the latitude and longitudes to reshape the axes
-        min_long = min(longitudes)
-        max_long = max(longitudes)
-        min_lat = min(latitudes)
-        max_lat = max(latitudes)
+        min_long = min(longs)
+        max_long = max(longs)
+        min_lat = min(lats)
+        max_lat = max(lats)
         long_buffer = abs(max_long - min_long) * 0.1
         lat_buffer = abs(max_lat - min_lat) * 0.1
 
         # Reshape the axes dimensions to place whitespace padding on all sides
-        # plt.xlim([min(longitudes) - long_buffer, max(longitudes) + long_buffer])
-        # plt.ylim([min(latitudes) - lat_buffer, max(latitudes) + lat_buffer])
+        plt.xlim([min(longs) - long_buffer, max(longs) + long_buffer])
+        plt.ylim([min(lats) - lat_buffer, max(lats) + lat_buffer])
 
         plt.ticklabel_format(style='plain', useOffset=False)
         plt.grid()
@@ -758,6 +758,16 @@ class Plot:
         #plt.scatter(fudge_est_longs, fudge_est_lats, color='k', marker='x')
         plt.scatter(nvector_est_longs, nvector_est_lats, color='c', marker='v')
 
+        cep_lats = []
+        cep_longs = []
+        #for j in range(0, len(longs)):
+        for j in range(10, 13):
+            for deg in range(0, 360):
+                (la, lo) = self._calculate_gps_position(lats[j], longs[j], 6.16, deg)
+                cep_lats.append(la)
+                cep_longs.append(lo)
+
+        plt.scatter(cep_longs, cep_lats, color='m', marker='.')
         print "len(est_lats): " + str(len(est_lats))
         #print "est_lats: " + str(est_lats)
         #print "est_longs: " + str(est_longs)
