@@ -173,6 +173,47 @@ class Plot:
 
         return distances
 
+    def gcs_to_n_vector(self,lat,longitude):
+        phi = math.radians(lat)
+        theta = math.radians(longitude)
+        x = math.cos(phi) * math.cos(theta)
+        y = math.cos(phi) * math.sin(theta)
+        z = math.sin(phi)
+        return [x,y,z]
+
+    def n_vector_to_gcs(self,nvector):
+        xsquared = nvector[0]**2
+        ysquared = nvector[1]**2
+        d = math.sqrt((xsquared+ysquared))
+
+        lat = math.atan2(nvector[2],d)
+        glong = math.atan2(nvector[1],nvector[0])
+        return (math.degrees(lat),math.degrees(glong))
+
+    def calculate_using_vectors(self,latitude,longitude,distance,heading):
+        r_earth = 6371e3
+        north_vector = [0,0,1]
+        initial_location = (latitude,longitude)
+
+        initial_vector = gcs_to_n_vector(initial_location[0],initial_location[1])
+        theta_bearing = radians(heading)
+
+        Get the vector east of initial location a
+        de = np.cross(north_vector,initial_vector)
+        #North vector at initial location
+        dn = np.cross(initial_vector,de)
+
+        #We need to compute the direction
+        direction = (np.dot(dn,math.cos(theta_bearing))) + (np.dot(de,math.sin(theta_bearing)))
+
+        xv = np.dot(initial_vector,math.cos(distance_traveled))
+        yv = np.dot(direction,math.sin(distance_traveled))
+        arrival_vector = xv + yv
+
+        return n_vector_to_gcs(arrival_vector)
+
+
+
     def _calculate_gps_position(self, latitude, longitude, distance, heading):
         """ Calculates a new GPS coordinate given a starting position, distance
         traveled, and heading. Returns a tuple representing the calculated
