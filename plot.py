@@ -15,7 +15,7 @@ In the example above, the main_loop_counter plot would be created in Figure 1,
 and the compass_vs_gps_heading plot would be created in Figure 2. The
 odometer_ticks plot will not be created since that line is commented out.
 """
-from math import radians, cos, sin, asin, sqrt
+from math import radians, degrees, cos, sin, asin, sqrt, atan2, fabs
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
@@ -39,9 +39,11 @@ class Plot:
                             'meters_per_gps_update',
                             'odometer_ticks',
                             'pitch_deg',
+                            'position_estimates',
                             'roll_deg',
                             'status',
                             'ticks_per_gps_update',
+                            'ticks_per_iteration',
                             'ticks_per_meter_per_gps_update']
 
     _plots = {}
@@ -117,12 +119,16 @@ class Plot:
             self._prepare_odometer_ticks_plot()
         elif plot_name == 'pitch_deg':
             self._prepare_pitch_deg_plot()
+        elif plot_name == 'position_estimates':
+            self._prepare_position_estimates_plot()
         elif plot_name == 'roll_deg':
             self._prepare_roll_deg_plot()
         elif plot_name == 'status':
             self._prepare_status_plot()
         elif plot_name == 'ticks_per_gps_update':
             self._prepare_ticks_per_gps_update_plot()
+        elif plot_name == 'ticks_per_iteration':
+            self._prepare_ticks_per_iteration_plot()
         elif plot_name == 'ticks_per_meter_per_gps_update':
             self._prepare_ticks_per_meter_per_gps_update_plot()
 
@@ -150,7 +156,7 @@ class Plot:
 
     def _calculate_dist_per_interval(self, coordinates, interval_indexes):
         """ Returns a list of the distance traveled between each
-        GPS update interval
+        GPS update interval in meters
         """
 
         # coordinates is a list of tuples (latitude, longitude)
@@ -166,6 +172,100 @@ class Plot:
             prev_position = new_position
 
         return distances
+
+    def gcs_to_n_vector(self,lat,longitude):
+        phi = radians(lat)
+        theta = radians(longitude)
+        x = cos(phi) * cos(theta)
+        y = cos(phi) * sin(theta)
+        z = sin(phi)
+        return [x,y,z]
+
+    def n_vector_to_gcs(self,nvector):
+        xsquared = nvector[0]**2
+        ysquared = nvector[1]**2
+        d = sqrt((xsquared+ysquared))
+
+        lat = atan2(nvector[2],d)
+        glong = atan2(nvector[1],nvector[0])
+        return (degrees(lat),degrees(glong))
+
+    def calculate_using_vectors(self,latitude,longitude,distance,heading):
+        r_earth = 6371e3
+        north_vector = [0,0,1]
+        initial_location = (latitude,longitude)
+
+        initial_vector = self.gcs_to_n_vector(initial_location[0],initial_location[1])
+        theta_bearing = radians(heading)
+
+        #Get the vector east of initial location a
+        de = np.cross(north_vector,initial_vector)
+        #North vector at initial location
+        dn = np.cross(initial_vector,de)
+
+        #We need to compute the direction
+        direction = (np.dot(dn,cos(theta_bearing))) + (np.dot(de,sin(theta_bearing)))
+
+        xv = np.dot(initial_vector,cos(distance/r_earth))
+        yv = np.dot(direction,sin(distance/r_earth))
+        arrival_vector = xv + yv
+
+        return self.n_vector_to_gcs(arrival_vector)
+
+
+
+    def _calculate_gps_position(self, latitude, longitude, distance, heading):
+        """ Calculates a new GPS coordinate given a starting position, distance
+        traveled, and heading. Returns a tuple representing the calculated
+        position in decimal degrees.
+
+        Assumes the GPS coordinates are specified as decimal degrees; distance
+        is specified in meters; and heading is specified in decimal degrees.
+        The heading is assumed to have already been  corrected for magnetic
+        declination (if needed).
+        """
+
+        earth_radius_m = 6371393.0
+
+        lat_rad = radians(latitude)
+        long_rad = radians(longitude)
+        heading_rad = radians(heading)
+
+        est_lat = asin( sin(lat_rad) * \
+            cos(distance/earth_radius_m) + \
+            cos(lat_rad) * \
+            sin(distance/earth_radius_m) * \
+            cos(heading_rad) )
+
+        est_long = long_rad + \
+            atan2( sin(heading_rad) * \
+            sin(distance/earth_radius_m) * \
+            cos(lat_rad), \
+            cos(distance/earth_radius_m) -
+            sin(lat_rad) *
+            sin(est_lat) )
+
+        new_lat = degrees(est_lat)
+        new_long = degrees(est_long)
+
+        return (new_lat, new_long)
+
+    def _calculate_mid_angle(self, heading_1, heading_2):
+        """ Returns the angle that is halfway between the specified angles """
+
+        h1_rad = radians(heading_1)
+        h2_rad = radians(heading_2)
+
+        # We're basically adding two vectors on a 2D plane to get the resultant
+        # vectors, whose angle is halfway between the two vectors.
+        resultant = (cos(h1_rad) + cos(h2_rad), sin(h1_rad) + sin(h2_rad))
+
+        mid_angle = degrees(atan2(resultant[1], resultant[0]))
+
+        if mid_angle < 0.0:
+            mid_angle = mid_angle + 360.0
+
+        return mid_angle
 
     def _calculate_ticks_per_interval(self, ticks, interval_indexes):
         """ Returns a list of the total number of ticks counted between each
@@ -239,7 +339,9 @@ class Plot:
 
         self._fill_zeroed_values(gps_heading_y_values)
 
-        plt.figure(self._plots['compass_vs_gps_heading'])
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['compass_vs_gps_heading']) + \
+            ' - Compass Heading vs GPS Heading')
         plt.xlabel('iteration')
         plt.ylabel('heading')
         plt.title('Compass Heading (Magnetic) and GPS Heading (True) in Degrees')
@@ -264,10 +366,20 @@ class Plot:
         self._fill_zeroed_values(latitudes)
         self._fill_zeroed_values(longitudes)
 
-        plt.figure(self._plots['gps_coordinates'])
+        # Calculate total distance driven during this runningcoords = []
+        coords = []
+        for index in range(0, len(latitudes)):
+            coords.append((latitudes[index], longitudes[index]))
+
+        distances = self._calculate_dist_per_interval(coords, range(0, len(latitudes)))
+        total_distance = sum(distances)
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['gps_coordinates']) + ' - GPS Coordinates')
         plt.xlabel('longitude')
         plt.ylabel('latitude')
-        plt.title('GPS Coordinates')
+        plt.title('GPS Coordinates' + \
+            '\ntotal distance: ' + "{:.2f}".format(total_distance) + ' meters')
         plt.axis('equal')
 
         # Find the ranges of the latitude and longitudes to reshape the axes
@@ -329,10 +441,15 @@ class Plot:
 
         self._fill_zeroed_values(y_values)
 
-        plt.figure(self._plots['gps_ground_speed_mph'])
+        #plt.figure(self._plots['gps_ground_speed_mph'])
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['gps_ground_speed_mph']) + \
+            ' - Ground Speed in Miles per Hour')
         plt.xlabel('iteration')
         plt.ylabel('speed (mph)')
-        plt.title('GPS Ground Speed in Miles per Hour')
+        plt.title('GPS Ground Speed in Miles per Hour' + \
+            '\nmax: ' + "{:.2f}".format(max(y_values)) + \
+            '  mean: ' + "{:.2f}".format(sum(y_values)/(len(y_values) + 0.0)))
         plt.ylim([min(y_values), max(y_values) + 1])
         plt.grid()
         plt.plot(x_values, y_values)
@@ -459,10 +576,13 @@ class Plot:
         y_values = np.asarray(self._data.get_all('odometer_ticks'))
         x_values = np.asarray(self._data.get_all('main_loop_counter'))
 
-        plt.figure(self._plots['odometer_ticks'])
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['odometer_ticks']) + \
+            ' - Cumulative Odometer Ticks')
         plt.xlabel('iteration')
         plt.ylabel('ticks')
-        plt.title('Odometer Ticks')
+        plt.title('Odometer Ticks' + \
+            '\ntotal: ' + str(max(y_values)))
         plt.grid()
         plt.plot(x_values, y_values)
 
@@ -478,6 +598,179 @@ class Plot:
         plt.title('Pitch in Degrees')
         plt.grid()
         plt.plot(x_values, y_values)
+
+    def _prepare_position_estimates_plot(self):
+        """ Plots the estimated positions between GPS updates """
+
+        latitudes = np.asarray(self._data.get_all('gps_latitude'))
+        longitudes = np.asarray(self._data.get_all('gps_longitude'))
+        ticks = np.asarray(self._data.get_all('odometer_ticks'))
+        headings = np.asarray(self._data.get_all('heading_deg'))
+        headings_raw = np.asarray(self._data.get_all('heading_raw'))
+        gps_headings = np.asarray(self._data.get_all('gps_ground_course_deg'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+        declination_deg = 4.0
+
+        ticks_per_meter = 7.6
+        earth_radius_m = 6371393.0
+
+        # Fill zeroed gps_headings
+        self._fill_zeroed_values(gps_headings)
+
+        # Find the indexes of the non-zero GPS coordinates
+        update_indexes = self._find_indexes_for_nonzero_values(latitudes)
+
+        prev_ticks = ticks[0]
+        ticks_per_iter = []
+        for iteration in range(0, len(iterations)):
+            ticks_per_iter.append(ticks[iteration] - prev_ticks)
+
+            prev_ticks = ticks[iteration]
+
+        lats = []
+        longs = []
+
+        # Remove zeroed values
+        for i in update_indexes:
+            lats.append(latitudes[i])
+            longs.append(longitudes[i])
+            # print "coordinate: " + str(latitudes[i]) + ", " + str(longitudes[i])
+
+        # Stores the lats and longs for Compass heading-based position estimates
+        est_lats = []
+        est_longs = []
+
+        # Stores the lats and longs for GPS heading-based position estimations
+        alt_est_lats = []
+        alt_est_longs = []
+
+        # Stores the lats and longs for position estimates based on compass
+        # headings that have a fudge factor added to them
+        fudge_est_lats = []
+        fudge_est_longs = []
+
+        nvector_est_lats = []
+        nvector_est_longs = []
+
+        print "update_indexes: " + str(update_indexes)
+
+        #for index in range(0, len(lats)):
+        for index in range(10, 13):
+            known_lat = lats[index]
+            known_long = longs[index]
+
+            alt_known_lat = lats[index]
+            alt_known_long = longs[index]
+
+            fudge_known_lat = lats[index]
+            fudge_known_long = longs[index]
+
+            nvector_known_lat = lats[index]
+            nvector_known_long = longs[index]
+
+            print "iteration: " + str(update_indexes[index])
+            print "gps coord: " + str(lats[index]) + ", " + str(longs[index])
+
+            i = update_indexes[index]
+
+            while (i < max(update_indexes) and i < update_indexes[index + 1]):
+                distance = (ticks_per_iter[i] + 0.0) / ticks_per_meter
+
+                # After looking at some of the data, I suspect that the compass
+                # is a little bit off. Here we'll add in a fudge factor to the
+                # raw heading. Remember: raw headings are integers in tenths of
+                # degrees
+                fudge = 150  # +15.0 degrees
+
+                compass_heading = headings[i] + declination_deg
+                gps_heading = gps_headings[i]
+                # fudged_compass_heading = ((headings_raw[i] + 40 + fudge) % 3600) / 10.0
+
+                # Forget the fudge. We'll try using the mid angle between the
+                # compass and GPS headings
+                fudged_compass_heading = self._calculate_mid_angle(compass_heading, gps_heading)
+
+                print "compass: " + str(compass_heading) + "; " + "gps: " + str(gps_heading) + "; " + "mid: " + str(fudged_compass_heading)
+
+                (fudge_lat, fudge_long) = self._calculate_gps_position(fudge_known_lat, fudge_known_long, distance, fudged_compass_heading)
+                (est_lat, est_long) = self._calculate_gps_position(known_lat, known_long, distance, compass_heading)
+                (alt_est_lat, alt_est_long) = self._calculate_gps_position(alt_known_lat, alt_known_long, distance, gps_heading)
+                (nvector_est_lat, nvector_est_long) = self.calculate_using_vectors(nvector_known_lat, nvector_known_long, distance, compass_heading)
+
+                if (distance > 0.0):
+                    est_lats.append(est_lat)
+                    est_longs.append(est_long)
+
+                    alt_est_lats.append(alt_est_lat)
+                    alt_est_longs.append(alt_est_long)
+
+                    fudge_est_lats.append(fudge_lat)
+                    fudge_est_longs.append(fudge_long)
+
+                    nvector_est_lats.append(nvector_est_lat)
+                    nvector_est_longs.append(nvector_est_long)
+
+                    known_lat = est_lat
+                    known_long = est_long
+
+                    alt_known_lat = alt_est_lat
+                    alt_known_long = alt_est_long
+
+                    fudge_known_lat = fudge_lat
+                    fudge_known_long = fudge_long
+
+                    nvector_known_lat = nvector_est_lat
+                    nvector_known_long = nvector_est_long
+
+                print "ticks[" + str(i) + "]: " + str(ticks_per_iter[i]) + "; distance: " + str(distance) + "; heading: " + str(headings[i]) + \
+                    "; est coord: " + str(est_lat) + ", " + str(est_long)
+
+                i = i + 1
+
+                if i >= max(update_indexes):
+                    break
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['position_estimates']) + ' - GPS Position Estimates')
+        plt.xlabel('longitude')
+        plt.ylabel('latitude')
+        plt.title('GPS Coordinates and Position Estimates' + \
+            '\nusing Heading and Odometry')
+        plt.axis('equal')
+
+        # Find the ranges of the latitude and longitudes to reshape the axes
+        min_long = min(longs)
+        max_long = max(longs)
+        min_lat = min(lats)
+        max_lat = max(lats)
+        long_buffer = abs(max_long - min_long) * 0.1
+        lat_buffer = abs(max_lat - min_lat) * 0.1
+
+        # Reshape the axes dimensions to place whitespace padding on all sides
+        plt.xlim([min(longs) - long_buffer, max(longs) + long_buffer])
+        plt.ylim([min(lats) - lat_buffer, max(lats) + lat_buffer])
+
+        plt.ticklabel_format(style='plain', useOffset=False)
+        plt.grid()
+        plt.scatter(longs, lats, color='g', marker='o')
+        plt.scatter(est_longs, est_lats, color='r', marker='x')
+        plt.scatter(alt_est_longs, alt_est_lats, color='b', marker='x')
+        plt.scatter(fudge_est_longs, fudge_est_lats, color='k', marker='x')
+        #plt.scatter(nvector_est_longs, nvector_est_lats, color='c', marker='v')
+
+        cep_lats = []
+        cep_longs = []
+        #for j in range(0, len(longs)):
+        for j in range(10, 13):
+            for deg in range(0, 360):
+                (la, lo) = self._calculate_gps_position(lats[j], longs[j], 6.16, deg)
+                cep_lats.append(la)
+                cep_longs.append(lo)
+
+        plt.scatter(cep_longs, cep_lats, color='m', marker='.')
+        print "len(est_lats): " + str(len(est_lats))
+        #print "est_lats: " + str(est_lats)
+        #print "est_longs: " + str(est_longs)
 
     def _prepare_roll_deg_plot(self):
         """ Plots the roll """
@@ -553,6 +846,45 @@ class Plot:
         plt.grid()
         plt.plot(update_indexes, tick_deltas)
 
+    def _prepare_ticks_per_iteration_plot(self):
+        """ Plots the number of ticks that were counted during each iteration"""
+
+        ticks = np.asarray(self._data.get_all('odometer_ticks'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        prev_ticks = ticks[0]
+        ticks_per_iter = []
+        for iteration in range(0, len(iterations)):
+            ticks_per_iter.append(ticks[iteration] - prev_ticks)
+
+            prev_ticks = ticks[iteration]
+
+        max_ticks = max(ticks_per_iter)
+        avg_ticks_per_iter = sum(ticks_per_iter) / (len(ticks) + 0.0)
+        stats = {}
+
+        for i in range(0, max_ticks + 1):
+            stats[i] = 0
+
+        for tick_count in ticks_per_iter:
+            stats[tick_count] = stats[tick_count] + 1
+
+        title_stats = ''
+        for tick_count in sorted(stats.keys()):
+            title_stats += str(tick_count) + ': ' + str(stats[tick_count]) + \
+            ' (' + "{:.2f}".format(stats[tick_count] * 100.0/len(ticks)) + '%) '
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['ticks_per_iteration']) + \
+            ' - Odometer Ticks Per Iteration')
+        plt.xlabel('iteration')
+        plt.ylabel('ticks')
+        plt.title('Ticks Per Iteration' + '\n[max: ' + str(max_ticks) + \
+            '; mean: ' + "{:.2f}".format(avg_ticks_per_iter) + ']' + \
+            '\n' + title_stats)
+        plt.grid()
+        plt.plot(iterations, ticks_per_iter)
+
     def _prepare_ticks_per_meter_per_gps_update_plot(self):
         """ Plots the number of ticks that were counted during each
         GPS update interval
@@ -597,7 +929,9 @@ class Plot:
         total_distance = sum(distances)
         total_ticks = np.amax(ticks)
 
-        plt.figure(self._plots['ticks_per_meter_per_gps_update'])
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['ticks_per_meter_per_gps_update']) + \
+            ' - Ticks Per Meter Per GPS Update Interval')
         plt.xlabel('interval index')
         plt.ylabel('ticks per meter')
         plt.title('Ticks Per Meter Per GPS Update Interval\nInterval Average: ' + \

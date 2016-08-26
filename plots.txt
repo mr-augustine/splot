@@ -1,19 +1,21 @@
 # Ignore this line
 #compass_vs_gps_heading
-#gps_coordinates
+gps_coordinates
 #gps_ground_course_deg
 #gps_ground_speed_kt
-#gps_ground_speed_mph
+gps_ground_speed_mph
 #gps_hdop
 #gps_pdop
 #gps_vdop
 #gps_satcount
-#heading_deg
+heading_deg
 #main_loop_counter
-#odometer_ticks
+odometer_ticks
+position_estimates
 #pitch_deg
 #roll_deg
-#status
+status
 #ticks_per_gps_update
 #meters_per_gps_update
-ticks_per_meter_per_gps_update
+#ticks_per_iteration
+#ticks_per_meter_per_gps_update
