@@ -754,9 +754,9 @@ class Plot:
         plt.grid()
         plt.scatter(longs, lats, color='g', marker='o')
         plt.scatter(est_longs, est_lats, color='r', marker='x')
-        #plt.scatter(alt_est_longs, alt_est_lats, color='b', marker='x')
-        #plt.scatter(fudge_est_longs, fudge_est_lats, color='k', marker='x')
-        plt.scatter(nvector_est_longs, nvector_est_lats, color='c', marker='v')
+        plt.scatter(alt_est_longs, alt_est_lats, color='b', marker='x')
+        plt.scatter(fudge_est_longs, fudge_est_lats, color='k', marker='x')
+        #plt.scatter(nvector_est_longs, nvector_est_lats, color='c', marker='v')
 
         cep_lats = []
         cep_longs = []
