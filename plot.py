@@ -25,6 +25,7 @@ from data import Data
 class Plot:
 
     SUPPORTED_PLOT_TYPES = ['compass_vs_gps_heading',
+                            'compass_vs_gps_vs_nav_heading',
                             'gps_coordinates',
                             'gps_cumulative_dist',
                             'gps_ground_course_deg',
@@ -37,13 +38,19 @@ class Plot:
                             'heading_deg',
                             'main_loop_counter',
                             'meters_per_gps_update',
+                            'nav_distance_to_waypoint',
+                            'nav_heading_deg',
+                            'nav_positions',
+                            'nav_relative_bearings',
+                            'nav_speed',
                             'odometer_ticks',
+                            'odometer_ticks_per_iteration',
+                            'odometer_timestamp',
                             'pitch_deg',
                             'position_estimates',
                             'roll_deg',
                             'status',
                             'ticks_per_gps_update',
-                            'ticks_per_iteration',
                             'ticks_per_meter_per_gps_update']
 
     _plots = {}
@@ -91,6 +98,8 @@ class Plot:
 
         if plot_name == 'compass_vs_gps_heading':
             self._prepare_compass_vs_gps_heading_plot()
+        elif plot_name == 'compass_vs_gps_vs_nav_heading':
+            self._prepare_compass_vs_gps_vs_nav_heading_plot()
         elif plot_name == 'gps_coordinates':
             self._prepare_gps_coordinates_plot()
         elif plot_name == 'gps_cumulative_dist':
@@ -115,8 +124,22 @@ class Plot:
             self._prepare_main_loop_counter_plot()
         elif plot_name == 'meters_per_gps_update':
             self._prepare_meters_per_gps_update_plot()
+        elif plot_name == 'nav_distance_to_waypoint':
+            self._prepare_nav_distance_to_waypoint_plot()
+        elif plot_name == 'nav_heading_deg':
+            self._prepare_nav_heading_deg_plot()
+        elif plot_name == 'nav_relative_bearings':
+            self._prepare_nav_relative_bearings_plot()
+        elif plot_name == 'nav_positions':
+            self._prepare_nav_positions_plot()
+        elif plot_name == 'nav_speed':
+            self._prepare_nav_speed_plot()
         elif plot_name == 'odometer_ticks':
             self._prepare_odometer_ticks_plot()
+        elif plot_name == 'odometer_ticks_per_iteration':
+            self._prepare_odometer_ticks_per_iteration_plot()
+        elif plot_name == 'odometer_timestamp':
+            self._prepare_odometer_timestamp_plot()
         elif plot_name == 'pitch_deg':
             self._prepare_pitch_deg_plot()
         elif plot_name == 'position_estimates':
@@ -127,8 +150,6 @@ class Plot:
             self._prepare_status_plot()
         elif plot_name == 'ticks_per_gps_update':
             self._prepare_ticks_per_gps_update_plot()
-        elif plot_name == 'ticks_per_iteration':
-            self._prepare_ticks_per_iteration_plot()
         elif plot_name == 'ticks_per_meter_per_gps_update':
             self._prepare_ticks_per_meter_per_gps_update_plot()
 
@@ -212,8 +233,6 @@ class Plot:
 
         return self.n_vector_to_gcs(arrival_vector)
 
-
-
     def _calculate_gps_position(self, latitude, longitude, distance, heading):
         """ Calculates a new GPS coordinate given a starting position, distance
         traveled, and heading. Returns a tuple representing the calculated
@@ -253,14 +272,15 @@ class Plot:
     def _calculate_mid_angle(self, heading_1, heading_2):
         """ Returns the angle that is halfway between the specified angles """
 
-        h1_rad = radians(heading_1)
-        h2_rad = radians(heading_2)
+        if heading_2 > heading_1:
+            temp = heading_1
+            heading_1 = heading_2
+            heading_2 = temp
 
-        # We're basically adding two vectors on a 2D plane to get the resultant
-        # vectors, whose angle is halfway between the two vectors.
-        resultant = (cos(h1_rad) + cos(h2_rad), sin(h1_rad) + sin(h2_rad))
+        if heading_2 - heading_1 > 180.0:
+            heading_2 -= 360.0
 
-        mid_angle = degrees(atan2(resultant[1], resultant[0]))
+        mid_angle = (heading_2 + heading_1) / 2.0;
 
         if mid_angle < 0.0:
             mid_angle = mid_angle + 360.0
@@ -348,6 +368,37 @@ class Plot:
         plt.grid()
         plt.plot(x_values, compass_y_values)
         plt.plot(x_values, gps_heading_y_values)
+
+    def _prepare_compass_vs_gps_vs_nav_heading_plot(self):
+        """ Plots the compass headings, gps headings and navigation heading
+        on the same plot
+        """
+
+        compass_headings = np.asarray(self._data.get_all('heading_deg'))
+        gps_headings = np.asarray(self._data.get_all('gps_ground_course_deg'))
+        nav_headings = np.asarray(self._data.get_all('nav_heading_deg'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        self._fill_zeroed_values(gps_headings)
+
+        nav_hdg_correct = []
+
+        for index in range(0, len(compass_headings)):
+            mid_angle = self._calculate_mid_angle(compass_headings[index], gps_headings[index])
+
+            nav_hdg_correct.append(mid_angle)
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['compass_vs_gps_vs_nav_heading']) + \
+            ' - Compass vs GPS vs Navigation Heading')
+        plt.xlabel('iteration')
+        plt.ylabel('heading (deg)')
+        plt.title('Compass vs GPS vs Navigation Heading in Degrees')
+        plt.grid()
+        plt.plot(iterations, compass_headings)
+        plt.plot(iterations, gps_headings)
+        plt.plot(iterations, nav_headings)
+        plt.plot(iterations, nav_hdg_correct, linestyle='dashed')
 
     def _prepare_gps_coordinates_plot(self):
         """ Plots the GPS coordinates on square axes """
@@ -570,6 +621,112 @@ class Plot:
         plt.grid()
         plt.plot(update_indexes, distances)
 
+    def _prepare_nav_distance_to_waypoint_plot(self):
+        """ Plots the calculated distance to the current waypoint in meters """
+
+        distances = np.asarray(self._data.get_all('nav_distance_to_waypt_m'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['nav_distance_to_waypoint']) + \
+            ' - Navigation Distances to Waypoints')
+        plt.xlabel('iteration')
+        plt.ylabel('distance (m)')
+        plt.title('Navigation Distances to Waypoints in Meters')
+        plt.grid()
+        plt.plot(iterations, distances)
+
+    def _prepare_nav_heading_deg_plot(self):
+        """ Plots the heading used for navigation calculations """
+
+        headings = np.asarray(self._data.get_all('nav_heading_deg'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['nav_heading_deg']) + \
+            ' - Navigation Headings')
+        plt.xlabel('iteration')
+        plt.ylabel('heading (deg)')
+        plt.title('Navigation Headings')
+        plt.grid()
+        plt.plot(iterations, headings)
+
+    def _prepare_nav_positions_plot(self):
+        """ Plots the estimated robot positions between the measured GPS
+        positions and the waypoints """
+
+        meas_latitudes = np.asarray(self._data.get_all('gps_latitude'))
+        meas_longitudes = np.asarray(self._data.get_all('gps_longitude'))
+        est_latitudes = np.asarray(self._data.get_all('nav_latitude'))
+        est_longitudes = np.asarray(self._data.get_all('nav_longitude'))
+        waypt_latitudes = np.asarray(self._data.get_all('nav_waypt_latitude'))
+        waypt_longitudes = np.asarray(self._data.get_all('nav_waypt_longitude'))
+
+        latitude_indexes = []
+        latitude_indexes = self._find_indexes_for_nonzero_values(meas_latitudes)
+
+        latitudes = []
+        longitudes = []
+
+        for index in latitude_indexes:
+            latitudes.append(meas_latitudes[index])
+            longitudes.append(meas_longitudes[index])
+
+        # Find the ranges of the latitude and longitudes to reshape the axes
+        min_long = min(longitudes)
+        max_long = max(longitudes)
+        min_lat = min(latitudes)
+        max_lat = max(latitudes)
+        long_buffer = abs(max_long - min_long) * 0.1
+        lat_buffer = abs(max_lat - min_lat) * 0.1
+
+        # Reshape the axes dimensions to place whitespace padding on all sides
+        plt.xlim([min(longitudes) - long_buffer, max(longitudes) + long_buffer])
+        plt.ylim([min(latitudes) - lat_buffer, max(latitudes) + lat_buffer])
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['nav_positions']) + \
+            ' - Navigation Positions')
+        plt.xlabel('longitude')
+        plt.ylabel('latitude')
+        plt.title('Navigation Positions \nGPS-measured, Calculated, and Waypoints')
+        plt.grid()
+        plt.axis('equal')
+        plt.ticklabel_format(style='plain', useOffset=False)
+        plt.scatter(longitudes, latitudes, color='g', marker='o')
+        #plt.scatter(est_longitudes, est_latitudes, color='b', marker='x')
+        plt.scatter(waypt_longitudes, waypt_latitudes, color='r', marker='*')
+
+    def _prepare_nav_relative_bearings_plot(self):
+        """ Plots the relative bearing to the waypoints """
+
+        bearings = np.asarray(self._data.get_all('nav_rel_bearing_deg'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['nav_relative_bearings']) + \
+            ' - Relative Bearings to Waypoints')
+        plt.xlabel('iteration')
+        plt.ylabel('bearing (deg)')
+        plt.title('Relative Bearings to Waypoints')
+        plt.grid()
+        plt.plot(iterations, bearings)
+
+    def _prepare_nav_speed_plot(self):
+        """ Plots the odometer-based speed value """
+
+        speed = np.asarray(self._data.get_all('nav_speed'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['nav_speed']) + \
+            ' - Navigation Speed (meters per sec)')
+        plt.xlabel('iteration')
+        plt.ylabel('speed (meters per sec)')
+        plt.title('Navigation Speed in Meters Per Second')
+        plt.grid()
+        plt.plot(iterations, speed)
+
     def _prepare_odometer_ticks_plot(self):
         """ Plots the odometer ticks """
 
@@ -585,6 +742,21 @@ class Plot:
             '\ntotal: ' + str(max(y_values)))
         plt.grid()
         plt.plot(x_values, y_values)
+
+    def _prepare_odometer_timestamp_plot(self):
+        """ Plots the timestamps for the odometer readings """
+
+        timestamps = np.asarray(self._data.get_all('odometer_timestamp'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['odometer_timestamp']) + \
+            ' - Odometer Timestamps')
+        plt.xlabel('iteration')
+        plt.ylabel('timestamp (ticks)')
+        plt.title('Odometer Timestamps in Loop-Time Ticks')
+        plt.grid()
+        plt.plot(iterations, timestamps)
 
     def _prepare_pitch_deg_plot(self):
         """ Plots the pitch """
@@ -846,7 +1018,7 @@ class Plot:
         plt.grid()
         plt.plot(update_indexes, tick_deltas)
 
-    def _prepare_ticks_per_iteration_plot(self):
+    def _prepare_odometer_ticks_per_iteration_plot(self):
         """ Plots the number of ticks that were counted during each iteration"""
 
         ticks = np.asarray(self._data.get_all('odometer_ticks'))
@@ -875,7 +1047,7 @@ class Plot:
             ' (' + "{:.2f}".format(stats[tick_count] * 100.0/len(ticks)) + '%) '
 
         plt.figure().canvas.set_window_title('Figure ' + \
-            str(self._plots['ticks_per_iteration']) + \
+            str(self._plots['odometer_ticks_per_iteration']) + \
             ' - Odometer Ticks Per Iteration')
         plt.xlabel('iteration')
         plt.ylabel('ticks')
