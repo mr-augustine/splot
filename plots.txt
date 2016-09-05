@@ -1,9 +1,9 @@
 # Ignore this line
 #compass_vs_gps_heading
-gps_coordinates
+#gps_coordinates
 #gps_ground_course_deg
 #gps_ground_speed_kt
-gps_ground_speed_mph
+#gps_ground_speed_mph
 #gps_hdop
 #gps_pdop
 #gps_vdop
@@ -11,8 +11,8 @@ gps_ground_speed_mph
 #heading_deg
 #nav_distance_to_waypoint
 #nav_heading_deg
-#nav_positions
-#nav_relative_bearings
+nav_positions
+nav_relative_bearings
 #compass_vs_gps_vs_nav_heading
 #main_loop_counter
 #odometer_ticks

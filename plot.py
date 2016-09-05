@@ -436,6 +436,8 @@ class Plot:
         nav_headings = np.asarray(self._data.get_all('nav_heading_deg'))
         iterations = np.asarray(self._data.get_all('main_loop_counter'))
 
+        nav_gps_hdg = np.asarray(self._data.get_all('nav_gps_heading'))
+
         self._fill_zeroed_values(gps_headings)
 
         # The robot's mid-angle calculation is correct now; we don't need this
@@ -456,6 +458,7 @@ class Plot:
         plt.plot(iterations, compass_headings)
         plt.plot(iterations, gps_headings)
         plt.plot(iterations, nav_headings)
+        plt.plot(iterations, nav_gps_hdg)
 
         # The robot's mid-angle calculation is good now; we don't need this
         #plt.plot(iterations, nav_hdg_correct, linestyle='dashed')
@@ -715,8 +718,8 @@ class Plot:
         """ Plots the estimated robot positions between the measured GPS
         positions and the waypoints """
 
-        meas_latitudes = np.asarray(self._data.get_all('gps_latitude'))
-        meas_longitudes = np.asarray(self._data.get_all('gps_longitude'))
+        meas_latitudes = np.asarray(self._data.get_all('gps_lat_ddeg'))
+        meas_longitudes = np.asarray(self._data.get_all('gps_long_ddeg'))
         est_latitudes = np.asarray(self._data.get_all('nav_latitude'))
         est_longitudes = np.asarray(self._data.get_all('nav_longitude'))
         waypt_latitudes = np.asarray(self._data.get_all('nav_waypt_latitude'))
@@ -761,25 +764,46 @@ class Plot:
         plt.scatter(est_longitudes, est_latitudes, color='b', marker='x')
         plt.scatter(waypt_longitudes, waypt_latitudes, color='r', marker='*')
 
-        print 'type(meas_latitudes[0]): ' + str(type(meas_latitudes[0].astype(np.float32)))
-        print 'Waypoint Coords\n--------------\n'
-        for index in range(0, 30):
-            print '(' + "{:.8f}".format(waypt_latitudes[index]) + ', ' + "{:.8f}".format(waypt_longitudes[index]) + ')'
+        # print 'type(meas_latitudes[0]): ' + str(type(meas_latitudes[0].astype(np.float32)))
+        # print 'Waypoint Coords\n--------------\n'
+        # for index in range(0, 30):
+        #     print '(' + "{:.8f}".format(waypt_latitudes[index]) + ', ' + "{:.8f}".format(waypt_longitudes[index]) + ')'
 
     def _prepare_nav_relative_bearings_plot(self):
         """ Plots the relative bearing to the waypoints """
 
-        bearings = np.asarray(self._data.get_all('nav_rel_bearing_deg'))
+        rel_bearings = np.asarray(self._data.get_all('nav_rel_bearing_deg'))
         iterations = np.asarray(self._data.get_all('main_loop_counter'))
+        nav_headings = np.asarray(self._data.get_all('nav_heading_deg'))
+
+        # The code snippet below was used to fix the miscalculated
+        # relative bearings. It's fixed in the robot code now. We don't need
+        # this snippet anymore.
+        # corrected_rel_bearings = []
+        #
+        # for index in range(0, len(iterations)):
+        #     gps_coord_angle = rel_bearings[index] + nav_headings[index]
+        #
+        #     diff = gps_coord_angle - nav_headings[index]
+        #
+        #     if (diff > 180.0):
+        #         corrected_rel_bearings.append(diff - 360.0)
+        #     elif (diff < -180.0):
+        #         corrected_rel_bearings.append(diff + 360.0)
+        #     else:
+        #         corrected_rel_bearings.append(diff)
 
         plt.figure().canvas.set_window_title('Figure ' + \
             str(self._plots['nav_relative_bearings']) + \
             ' - Relative Bearings to Waypoints')
         plt.xlabel('iteration')
         plt.ylabel('bearing (deg)')
+        plt.xlim([0, len(iterations) + len(iterations) * 0.05])
+        plt.ylim([-190, 190])
         plt.title('Relative Bearings to Waypoints')
         plt.grid()
-        plt.plot(iterations, bearings)
+        plt.plot(iterations, rel_bearings)
+        # plt.plot(iterations, corrected_rel_bearings)
 
     def _prepare_nav_speed_plot(self):
         """ Plots the odometer-based speed value """
@@ -1149,7 +1173,6 @@ class Plot:
         plt.scatter(est_longs, est_lats, color='r', marker='x')
         plt.scatter(gps_longs, gps_lats, color='b', marker='x')
         plt.scatter(mix_longs, mix_lats, color='k', marker='x')
-
 
     def _get_lat_long_fields(self, sentence):
         """ Returns the latitude, latitude hemisphere, longitude, and
