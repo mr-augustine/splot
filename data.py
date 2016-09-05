@@ -59,6 +59,7 @@ class Data:
             format_string = '<h'
         elif datatype == 'int8_t':
             format_string = '<b'
+        # Assuming Arduino; so treat float and double as single-precision float
         elif datatype == 'float' or datatype == 'double':
             format_string = '<f'
 
