@@ -440,14 +440,6 @@ class Plot:
 
         self._fill_zeroed_values(gps_headings)
 
-        # The robot's mid-angle calculation is correct now; we don't need this
-        # nav_hdg_correct = []
-        #
-        # for index in range(0, len(compass_headings)):
-        #     mid_angle = self._calculate_mid_angle(compass_headings[index], gps_headings[index])
-        #
-        #     nav_hdg_correct.append(mid_angle)
-
         plt.figure().canvas.set_window_title('Figure ' + \
             str(self._plots['compass_vs_gps_vs_nav_heading']) + \
             ' - Compass vs GPS vs Navigation Heading')
@@ -459,9 +451,6 @@ class Plot:
         plt.plot(iterations, gps_headings)
         plt.plot(iterations, nav_headings)
         plt.plot(iterations, nav_gps_hdg)
-
-        # The robot's mid-angle calculation is good now; we don't need this
-        #plt.plot(iterations, nav_hdg_correct, linestyle='dashed')
 
     def _prepare_gps_coordinates_plot(self):
         """ Plots the GPS coordinates on square axes """
