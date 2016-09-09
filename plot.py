@@ -26,6 +26,12 @@ class Plot:
 
     SUPPORTED_PLOT_TYPES = ['compass_vs_gps_heading',
                             'compass_vs_gps_vs_nav_heading',
+                            'control_heading_desired',
+                            'control_steering_pwm_vs_commanded',
+                            'control_xtrack_error',
+                            'control_xtrack_error_rate',
+                            'control_xtrack_error_sum',
+                            'desired_vs_actual_headings',
                             'gps_coordinates',
                             'gps_cumulative_dist',
                             'gps_ground_course_deg',
@@ -101,6 +107,18 @@ class Plot:
             self._prepare_compass_vs_gps_heading_plot()
         elif plot_name == 'compass_vs_gps_vs_nav_heading':
             self._prepare_compass_vs_gps_vs_nav_heading_plot()
+        elif plot_name == 'control_heading_desired':
+            self._prepare_control_heading_desired_plot()
+        elif plot_name == 'control_steering_pwm_vs_commanded':
+            self._prepare_control_steering_pwm_vs_commanded_plot()
+        elif plot_name == 'control_xtrack_error':
+            self._prepare_control_xtrack_error_plot()
+        elif plot_name == 'control_xtrack_error_rate':
+            self._prepare_control_xtrack_error_rate_plot()
+        elif plot_name == 'control_xtrack_error_sum':
+            self._prepare_control_xtrack_error_sum_plot()
+        elif plot_name == 'desired_vs_actual_headings':
+            self._prepare_desired_vs_actual_headings_plot()
         elif plot_name == 'gps_coordinates':
             self._prepare_gps_coordinates_plot()
         elif plot_name == 'gps_cumulative_dist':
@@ -451,6 +469,102 @@ class Plot:
         plt.plot(iterations, gps_headings)
         plt.plot(iterations, nav_headings)
         plt.plot(iterations, nav_gps_hdg)
+
+    def _prepare_control_heading_desired_plot(self):
+        """ Plots the target headings """
+
+        target_headings = np.asarray(self._data.get_all('control_heading_desired'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['control_heading_desired']) + \
+            ' - Desired Heading')
+        plt.title('Desired Heading')
+        plt.xlabel('iteration')
+        plt.ylabel('heading (deg)')
+        plt.grid()
+        plt.plot(iterations, target_headings)
+
+    def _prepare_control_steering_pwm_vs_commanded_plot(self):
+        """ Plots the calculated steering PWM values versus the commanded
+        steering PWM values on the same plot
+        """
+
+        control_pwm = np.asarray(self._data.get_all('control_steering_pwm'))
+        commanded_pwm = np.asarray(self._data.get_all('mobility_steering_pwm'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['control_steering_pwm_vs_commanded']) + \
+            ' - Control Steering vs Commanded Steering PWM')
+        plt.title('Control Steering vs Commanded Steering PWM')
+        plt.xlabel('iteration')
+        plt.ylabel('pulse width (us)')
+        plt.grid()
+        plt.plot(iterations, control_pwm)
+        plt.plot(iterations, commanded_pwm)
+
+    def _prepare_control_xtrack_error_plot(self):
+        """ Plots the cross track error """
+
+        xtrack_errors = np.asarray(self._data.get_all('control_xtrack_error'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['control_xtrack_error']) + \
+            ' - Cross Track Error')
+        plt.title('Cross-Track Error')
+        plt.xlabel('iteration')
+        plt.ylabel('error (deg)')
+        plt.grid()
+        plt.plot(iterations, xtrack_errors)
+
+    def _prepare_control_xtrack_error_rate_plot(self):
+        """ Plots the cross track error rate """
+
+        xtrack_error_rates = np.asarray(self._data.get_all('control_xtrack_error_rate'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['control_xtrack_error_rate']) + \
+            ' - Cross Track Error Rate')
+        plt.title('Cross Track Error Rate')
+        plt.xlabel('iteration')
+        plt.ylabel('error rate (deg/computation cycle)')
+        plt.grid()
+        plt.plot(iterations, xtrack_error_rates)
+
+    def _prepare_control_xtrack_error_sum_plot(self):
+        """ Plots the cross track error sum """
+
+        xtrack_error_sums = np.array(self._data.get_all('control_xtrack_error_sum'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['control_xtrack_error_sum']) +\
+            ' - Cross Track Error Sum')
+        plt.title('Cross Track Error Sum')
+        plt.xlabel('iteration')
+        plt.ylabel('sum (deg)')
+        plt.grid()
+        plt.plot(iterations, xtrack_error_sums)
+
+    def _prepare_desired_vs_actual_headings_plot(self):
+        """ Plots the desired headings and the nav headings on the same plot """
+
+        target_headings = np.asarray(self._data.get_all('control_heading_desired'))
+        nav_headings = np.asarray(self._data.get_all('nav_heading_deg'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['desired_vs_actual_headings']) + \
+            ' - Desired vs Actual Headings')
+        plt.title('Desired vs Actual Headings')
+        plt.xlabel('iteration')
+        plt.ylabel('heading (deg)')
+        plt.grid()
+        plt.plot(iterations, target_headings)
+        plt.plot(iterations, nav_headings)
 
     def _prepare_gps_coordinates_plot(self):
         """ Plots the GPS coordinates on square axes """

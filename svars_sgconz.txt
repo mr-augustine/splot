@@ -1,5 +1,5 @@
 # Statevars definition for demo_sgconz data files
-# This verion has timestamp data associated with odometer ticks
+# This version has timestamp data associated with odometer ticks
 #<data_type>, <name> [, expected_value]
 uint32_t, prefix, 0xDADAFEED
 uint32_t, status

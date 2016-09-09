@@ -11,10 +11,10 @@
 #heading_deg
 #nav_distance_to_waypoint
 #nav_heading_deg
-nav_positions
-nav_relative_bearings
+#nav_positions
+#nav_relative_bearings
 #compass_vs_gps_vs_nav_heading
-#main_loop_counter
+main_loop_counter
 #odometer_ticks
 #odometer_ticks_per_iteration
 #odometer_timestamp
@@ -26,4 +26,10 @@ nav_relative_bearings
 #meters_per_gps_update
 #ticks_per_meter_per_gps_update
 #nav_speed
-simulate_nav_positions
+#simulate_nav_positions
+desired_vs_actual_headings
+control_heading_desired
+control_xtrack_error
+control_xtrack_error_rate
+control_xtrack_error_sum
+control_steering_pwm_vs_commanded
