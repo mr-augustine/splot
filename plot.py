@@ -44,6 +44,7 @@ class Plot:
                             'heading_deg',
                             'main_loop_counter',
                             'meters_per_gps_update',
+                            'mobility_motor_pwm',
                             'nav_distance_to_waypoint',
                             'nav_heading_deg',
                             'nav_positions',
@@ -56,6 +57,7 @@ class Plot:
                             'position_estimates',
                             'roll_deg',
                             'simulate_nav_positions',
+                            'simulate_xtrack_error',
                             'status',
                             'ticks_per_gps_update',
                             'ticks_per_meter_per_gps_update']
@@ -143,6 +145,8 @@ class Plot:
             self._prepare_main_loop_counter_plot()
         elif plot_name == 'meters_per_gps_update':
             self._prepare_meters_per_gps_update_plot()
+        elif plot_name == 'mobility_motor_pwm':
+            self._prepare_mobility_motor_pwm_plot()
         elif plot_name == 'nav_distance_to_waypoint':
             self._prepare_nav_distance_to_waypoint_plot()
         elif plot_name == 'nav_heading_deg':
@@ -167,6 +171,8 @@ class Plot:
             self._prepare_roll_deg_plot()
         elif plot_name == 'simulate_nav_positions':
             self._prepare_simulate_nav_positions_plot()
+        elif plot_name == 'simulate_xtrack_error':
+            self._prepare_simulate_xtrack_error_plot()
         elif plot_name == 'status':
             self._prepare_status_plot()
         elif plot_name == 'ticks_per_gps_update':
@@ -362,6 +368,20 @@ class Plot:
 
         return np.float32(mid_angle)
 
+    def _calculate_relative_bearing(self, desired, actual):
+        """ Calculates the relative bearing between a desired heading and
+        and actual heading
+        """
+
+        diff = desired - actual
+
+        if diff > 180.0:
+            return (diff - 360.0)
+        elif diff < -180.0:
+            return (diff + 360.0)
+
+        return diff
+
     def _calculate_ticks_per_interval(self, ticks, interval_indexes):
         """ Returns a list of the total number of ticks counted between each
         GPS update interval
@@ -486,13 +506,18 @@ class Plot:
         plt.plot(iterations, target_headings)
 
     def _prepare_control_steering_pwm_vs_commanded_plot(self):
-        """ Plots the calculated steering PWM values versus the commanded
-        steering PWM values on the same plot
+        """ Plots the control (calculated) steering PWM values versus the
+        commanded steering PWM values on the same plot
         """
 
         control_pwm = np.asarray(self._data.get_all('control_steering_pwm'))
         commanded_pwm = np.asarray(self._data.get_all('mobility_steering_pwm'))
         iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        # Scale the pwm values by four to get microseconds
+        for index in range(0, len(iterations)):
+            control_pwm[index] = control_pwm[index] * 4
+            commanded_pwm[index] = commanded_pwm[index] * 4
 
         plt.figure().canvas.set_window_title('Figure ' + \
             str(self._plots['control_steering_pwm_vs_commanded']) + \
@@ -501,8 +526,9 @@ class Plot:
         plt.xlabel('iteration')
         plt.ylabel('pulse width (us)')
         plt.grid()
-        plt.plot(iterations, control_pwm)
-        plt.plot(iterations, commanded_pwm)
+        control, = plt.plot(iterations, control_pwm, label='Control')
+        commanded, = plt.plot(iterations, commanded_pwm, label='Commanded')
+        plt.legend(handles=[control, commanded])
 
     def _prepare_control_xtrack_error_plot(self):
         """ Plots the cross track error """
@@ -554,6 +580,7 @@ class Plot:
 
         target_headings = np.asarray(self._data.get_all('control_heading_desired'))
         nav_headings = np.asarray(self._data.get_all('nav_heading_deg'))
+        compass_headings = np.asarray(self._data.get_all('heading_deg'))
         iterations = np.asarray(self._data.get_all('main_loop_counter'))
 
         plt.figure().canvas.set_window_title('Figure ' + \
@@ -563,8 +590,10 @@ class Plot:
         plt.xlabel('iteration')
         plt.ylabel('heading (deg)')
         plt.grid()
-        plt.plot(iterations, target_headings)
-        plt.plot(iterations, nav_headings)
+        desired, = plt.plot(iterations, target_headings, label='Desired')
+        actual, = plt.plot(iterations, nav_headings, label='Actual')
+        compass, = plt.plot(iterations, compass_headings, label='Compass')
+        plt.legend(handles = [desired, actual, compass])
 
     def _prepare_gps_coordinates_plot(self):
         """ Plots the GPS coordinates on square axes """
@@ -786,6 +815,25 @@ class Plot:
         plt.title('Displacement Per GPS Update Interval')
         plt.grid()
         plt.plot(update_indexes, distances)
+
+    def _prepare_mobility_motor_pwm_plot(self):
+        """ Plots the commanded motor PWM values """
+
+        motor_pwms = np.asarray(self._data.get_all('mobility_motor_pwm'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        # Multiply by 4 to get the value in microseconds
+        for index in range(0, len(motor_pwms)):
+            motor_pwms[index] = motor_pwms[index] * 4
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['mobility_motor_pwm']) + \
+            ' - Mobility Motor PWM')
+        plt.xlabel('iterations')
+        plt.ylabel('pulse width (us)')
+        plt.title('Mobility Motor PWM')
+        plt.grid()
+        plt.plot(iterations, motor_pwms)
 
     def _prepare_nav_distance_to_waypoint_plot(self):
         """ Plots the calculated distance to the current waypoint in meters """
@@ -1276,6 +1324,30 @@ class Plot:
         plt.scatter(est_longs, est_lats, color='r', marker='x')
         plt.scatter(gps_longs, gps_lats, color='b', marker='x')
         plt.scatter(mix_longs, mix_lats, color='k', marker='x')
+
+    def _prepare_simulate_xtrack_error_plot(self):
+        """ Simulates the Cross-Track error """
+
+        desired_headings = np.asarray(self._data.get_all('control_heading_desired'))
+        nav_headings = np.asarray(self._data.get_all('nav_heading_deg'))
+        iterations = np.asarray(self._data.get_all('main_loop_counter'))
+
+        xtrack_errors = []
+
+        for index in range(0, len(iterations)):
+            xtrack_errors.append(self._calculate_relative_bearing(desired_headings[index], nav_headings[index]))
+
+        plt.figure().canvas.set_window_title('Figure ' + \
+            str(self._plots['simulate_xtrack_error']) + \
+            ' - Simulated Cross-Track Error')
+        plt.xlabel('iterations')
+        plt.ylabel('error (deg)')
+        plt.title('Simulated Cross-Track Error')
+        plt.grid()
+        desired, = plt.plot(iterations, desired_headings, label='Desired')
+        actual, = plt.plot(iterations, nav_headings, label='Actual')
+        error, = plt.plot(iterations, xtrack_errors, label='Error')
+        plt.legend(handles = [desired, actual, error])
 
     def _get_lat_long_fields(self, sentence):
         """ Returns the latitude, latitude hemisphere, longitude, and
